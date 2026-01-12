@@ -57,14 +57,6 @@ When confronting the train/test boundary, three coherent positions exist:
 
 None of these approaches is obviously correct. Each involves trade-offs between semantic consistency, data leakage, and the ability to predict at new locations. The common practice (Position A) works for in-sample evaluation but leaves prediction to new locations undefined. Position C variants enable prediction but introduce semantic inconsistency—the model learns relationships among training neighbors but predicts using different neighbor definitions.
 
-## Examples from Literature
-
-**Position A in practice [@Liu2022-pv]**: Compute spatial lags on the full dataset before partitioning for cross-validation. This is common practice—works for in-sample evaluation but leaves prediction to new locations undefined.
-
-**Position C1 in practice [@sarf2025]**: The `{sarf}` package's `spatial_cv_rf()` function finds neighbors in the training set for each test observation independently. Test points do not see each other, even if spatially adjacent.
-
-**Position C1 with explicit prediction [@Gao2025-mgwxgb]**: M-GWXGB explicitly implements prediction to new locations by finding k-nearest training locations and averaging their local model predictions. This requires persisting all local models, training locations, and bandwidth—the model alone cannot predict.
-
 ## Challenges for Prediction
 
 Three core challenges emerge across prediction scenarios:
@@ -77,9 +69,59 @@ Three core challenges emerge across prediction scenarios:
 
 The literature largely overlooks these challenges. Papers focus on model training but do not account for predicting to **new locations**. This creates a gap between methodological innovation and operational deployment. Prediction at new locations is not a trivial extension of training—it requires explicit protocols for SWM persistence, adjacency decisions at prediction time, and covariate availability.
 
----
 
-## Detailed Outline
+## Examples from Literature
+
+**Position A in practice [@Liu2022-pv]**: Compute spatial lags on the full dataset before partitioning for cross-validation. This is common practice—works for in-sample evaluation but leaves prediction to new locations undefined.
+
+**Position C1 in practice [@sarf2025]**: The `{sarf}` package's `spatial_cv_rf()` function finds neighbors in the training set for each test observation independently. Test points do not see each other, even if spatially adjacent.
+
+**Position C1 with explicit prediction [@Gao2025-mgwxgb]**: M-GWXGB explicitly implements prediction to new locations by finding k-nearest training locations and averaging their local model predictions. This requires persisting all local models, training locations, and bandwidth—the model alone cannot predict.
+
+## Status Quo
+
+Above has discussed spatial lags and the issues associated with them.
+Below is the general status quo of spatially explicit modelling techniques.
+
+### Unproblematic spatially explicit modeling techniques
+
+The following techniques are not problematic in creating spatially explicit
+traditional ML models (regression, tree-based models, NN, etc.).
+
+- no spatial features (no problem)
+- with X & Y coords (no probem-ish)
+- with spatial indices (H3, S2, Geohash)
+- spatial regimes (categorical variables indicating a location—e.g. state name, county ID, etc.)
+
+### Distance Features 
+
+- Begets similar questions:
+- Which distance features do we use? 
+- Training distance features (Option A)?
+- New distance features relevant to test set (Option B)?
+- Training distance features + new relevant distant features (Option C2)?
+
+### MEMs
+
+- depends on the SWM
+- Option A works—store MEMs and query them for new features
+- Option B works—calculate MEMs on new data exact same way (this is inductive approach similar to inductive graph models)
+- Option C doesn't work—we'd need to get a MEM for a new feature not in the SWM
+
+### GWR & MGWR
+
+todo!()
+
+### Graph Models
+
+- inductive (new graph option B)
+- transductive (same graph new data Option A)
+- transductive (new points in same graph Option C1 & C2 requires inserting into Adjacenc and running forward pass for fine tuning)
+  - what is the consequence of this?
+  
+------
+
+# Notes
 
 ### Current Practice and Its Implicit Assumptions
 
@@ -91,7 +133,7 @@ The literature largely overlooks these challenges. Papers focus on model trainin
 - This workflow implicitly assumes a closed system where all locations are known at training time
 - Prediction to genuinely new locations is undefined because the workflow was never designed for it
 
-### Three Positions on Spatial Feature Construction (Detailed)
+### 3 Positions on Spatial Feature Construction 
 
 When confronting the train/test boundary, three coherent positions exist. For illustration, assume we use $k$-nearest neighbors (kNN) as the method of defining adjacency, though the logic applies to other adjacency definitions.
 

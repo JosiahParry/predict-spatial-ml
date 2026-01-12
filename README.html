@@ -166,12 +166,6 @@ window.Quarto = {
 </ul>
 <p>None of these approaches is obviously correct. Each involves trade-offs between semantic consistency, data leakage, and the ability to predict at new locations. The common practice (Position A) works for in-sample evaluation but leaves prediction to new locations undefined. Position C variants enable prediction but introduce semantic inconsistency—the model learns relationships among training neighbors but predicts using different neighbor definitions.</p>
 </section>
-<section id="examples-from-literature" class="level2">
-<h2 class="anchored" data-anchor-id="examples-from-literature">Examples from Literature</h2>
-<p><strong>Position A in practice <span class="citation" data-cites="Liu2022-pv">(<a href="#ref-Liu2022-pv" role="doc-biblioref">Liu, Kounadi, and Zurita-Milla 2022</a>)</span></strong>: Compute spatial lags on the full dataset before partitioning for cross-validation. This is common practice—works for in-sample evaluation but leaves prediction to new locations undefined.</p>
-<p><strong>Position C1 in practice <span class="citation" data-cites="sarf2025">(<a href="#ref-sarf2025" role="doc-biblioref">Credit 2025</a>)</span></strong>: The <code>{sarf}</code> package’s <code>spatial_cv_rf()</code> function finds neighbors in the training set for each test observation independently. Test points do not see each other, even if spatially adjacent.</p>
-<p><strong>Position C1 with explicit prediction <span class="citation" data-cites="Gao2025-mgwxgb">(<a href="#ref-Gao2025-mgwxgb" role="doc-biblioref">Gao, He, and Kwan 2025</a>)</span></strong>: M-GWXGB explicitly implements prediction to new locations by finding k-nearest training locations and averaging their local model predictions. This requires persisting all local models, training locations, and bandwidth—the model alone cannot predict.</p>
-</section>
 <section id="challenges-for-prediction" class="level2">
 <h2 class="anchored" data-anchor-id="challenges-for-prediction">Challenges for Prediction</h2>
 <p>Three core challenges emerge across prediction scenarios:</p>
@@ -179,10 +173,64 @@ window.Quarto = {
 <p><strong>2. Feature Construction</strong>: Spatial lags for new locations require covariate values from neighbors. This raises the question: how do we determine which features are neighbors of the new prediction point? Those neighbors may be training observations, new observations, or both—corresponding to the positions outlined above.</p>
 <p><strong>3. Storing the Adjacency Matrix and Training Features</strong>: Both adjacency modification and feature construction require access to the original SWM and covariate values. These must be persisted beyond training—not typically part of standard ML model serialization. For methods like GWR/MGWR, the entire training dataset must be stored alongside the model.</p>
 <p>The literature largely overlooks these challenges. Papers focus on model training but do not account for predicting to <strong>new locations</strong>. This creates a gap between methodological innovation and operational deployment. Prediction at new locations is not a trivial extension of training—it requires explicit protocols for SWM persistence, adjacency decisions at prediction time, and covariate availability.</p>
+</section>
+<section id="examples-from-literature" class="level2">
+<h2 class="anchored" data-anchor-id="examples-from-literature">Examples from Literature</h2>
+<p><strong>Position A in practice <span class="citation" data-cites="Liu2022-pv">(<a href="#ref-Liu2022-pv" role="doc-biblioref">Liu, Kounadi, and Zurita-Milla 2022</a>)</span></strong>: Compute spatial lags on the full dataset before partitioning for cross-validation. This is common practice—works for in-sample evaluation but leaves prediction to new locations undefined.</p>
+<p><strong>Position C1 in practice <span class="citation" data-cites="sarf2025">(<a href="#ref-sarf2025" role="doc-biblioref">Credit 2025</a>)</span></strong>: The <code>{sarf}</code> package’s <code>spatial_cv_rf()</code> function finds neighbors in the training set for each test observation independently. Test points do not see each other, even if spatially adjacent.</p>
+<p><strong>Position C1 with explicit prediction <span class="citation" data-cites="Gao2025-mgwxgb">(<a href="#ref-Gao2025-mgwxgb" role="doc-biblioref">Gao, He, and Kwan 2025</a>)</span></strong>: M-GWXGB explicitly implements prediction to new locations by finding k-nearest training locations and averaging their local model predictions. This requires persisting all local models, training locations, and bandwidth—the model alone cannot predict.</p>
+</section>
+<section id="status-quo" class="level2">
+<h2 class="anchored" data-anchor-id="status-quo">Status Quo</h2>
+<p>Above has discussed spatial lags and the issues associated with them. Below is the general status quo of spatially explicit modelling techniques.</p>
+<section id="unproblematic-spatially-explicit-modeling-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="unproblematic-spatially-explicit-modeling-techniques">Unproblematic spatially explicit modeling techniques</h3>
+<p>The following techniques are not problematic in creating spatially explicit traditional ML models (regression, tree-based models, NN, etc.).</p>
+<ul>
+<li>no spatial features (no problem)</li>
+<li>with X &amp; Y coords (no probem-ish)</li>
+<li>with spatial indices (H3, S2, Geohash)</li>
+<li>spatial regimes (categorical variables indicating a location—e.g.&nbsp;state name, county ID, etc.)</li>
+</ul>
+</section>
+<section id="distance-features" class="level3">
+<h3 class="anchored" data-anchor-id="distance-features">Distance Features</h3>
+<ul>
+<li>Begets similar questions:</li>
+<li>Which distance features do we use?</li>
+<li>Training distance features (Option A)?</li>
+<li>New distance features relevant to test set (Option B)?</li>
+<li>Training distance features + new relevant distant features (Option C2)?</li>
+</ul>
+</section>
+<section id="mems" class="level3">
+<h3 class="anchored" data-anchor-id="mems">MEMs</h3>
+<ul>
+<li>depends on the SWM</li>
+<li>Option A works—store MEMs and query them for new features</li>
+<li>Option B works—calculate MEMs on new data exact same way (this is inductive approach similar to inductive graph models)</li>
+<li>Option C doesn’t work—we’d need to get a MEM for a new feature not in the SWM</li>
+</ul>
+</section>
+<section id="gwr-mgwr" class="level3">
+<h3 class="anchored" data-anchor-id="gwr-mgwr">GWR &amp; MGWR</h3>
+<p>todo!()</p>
+</section>
+<section id="graph-models" class="level3">
+<h3 class="anchored" data-anchor-id="graph-models">Graph Models</h3>
+<ul>
+<li>inductive (new graph option B)</li>
+<li>transductive (same graph new data Option A)</li>
+<li>transductive (new points in same graph Option C1 &amp; C2 requires inserting into Adjacenc and running forward pass for fine tuning)
+<ul>
+<li>what is the consequence of this?</li>
+</ul></li>
+</ul>
 <hr>
 </section>
-<section id="detailed-outline" class="level2">
-<h2 class="anchored" data-anchor-id="detailed-outline">Detailed Outline</h2>
+</section>
+<section id="notes" class="level1">
+<h1>Notes</h1>
 <section id="current-practice-and-its-implicit-assumptions" class="level3">
 <h3 class="anchored" data-anchor-id="current-practice-and-its-implicit-assumptions">Current Practice and Its Implicit Assumptions</h3>
 <ul>
@@ -195,8 +243,8 @@ window.Quarto = {
 <li>Prediction to genuinely new locations is undefined because the workflow was never designed for it</li>
 </ul>
 </section>
-<section id="three-positions-on-spatial-feature-construction-detailed" class="level3">
-<h3 class="anchored" data-anchor-id="three-positions-on-spatial-feature-construction-detailed">Three Positions on Spatial Feature Construction (Detailed)</h3>
+<section id="positions-on-spatial-feature-construction" class="level3">
+<h3 class="anchored" data-anchor-id="positions-on-spatial-feature-construction">3 Positions on Spatial Feature Construction</h3>
 <p>When confronting the train/test boundary, three coherent positions exist. For illustration, assume we use <span class="math inline">\(k\)</span>-nearest neighbors (kNN) as the method of defining adjacency, though the logic applies to other adjacency definitions.</p>
 <p><strong>A. Closed system (transductive)</strong></p>
 <ul>
