@@ -1,0 +1,53 @@
+---
+title: Prediction challenges with spatially explicit models
+author: Josiah Parry
+format: revealjs
+---
+
+## "Spatially explicit" models"
+
+- Space measured directly in the model e.g.:
+    - Including X/Y coordinates
+    - Distance features
+    - Spatial regimes (categorical variables)
+    - Spatial Indexing—H3, S2, Geohashes (as a spatial regime)
+    - Spatial Lags (weighted average from X and SWM)
+    - MEMs (derived from SWM)
+    - Location Embeddings
+- Models:
+    - Graph Neural Nets
+        - Using message passing (Spatial Lag on “hidden dimensions”)
+    - (M)GWR
+    - SAR models (by using spatial lag)
+
+## Potentially Problematic for Prediction
+
+- X & Y coordinates
+- Spatial regimes
+- Spatial Indices
+- Distance features
+- Location embeddings
+
+## Definitely Problematic for Prediction
+
+- MEMs
+- Spatial Lag variables
+- Graph Neural Networks (GNN) / Message Passing
+
+
+## General "Problem" Categories
+
+- Requires persisting training data
+    - Distance Features
+    - (M)GWR
+- Undefined feature construction
+    - Spatial Lag
+    - Distance Features
+    - GNNs (transductive models only)
+    - MEMs
+- Spatial Extent
+    - Using XY
+    - Location Embeddings
+- Unseen in training
+    - Spatial Regimes
+    - Spatial Index

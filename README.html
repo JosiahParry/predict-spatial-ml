@@ -89,10 +89,11 @@ window.Quarto = {
 
 </head>
 
-<body class="fullcontent quarto-light">
+<body class="quarto-light">
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
-
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="README.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -129,7 +130,7 @@ window.Quarto = {
 
 <section id="problem-statement" class="level2">
 <h2 class="anchored" data-anchor-id="problem-statement">Problem Statement</h2>
-<p>Predicting to new locations in spatially explicit machine learning models is ill-defined. These models use spatially lagged covariates, or message passing in the case of graph neural networks (GNNs), which are defined only for locations embedded in the training spatial weights matrix (SWM). Prediction requires both identifying the neighborhood structure of new locations and accessing the covariate values used to construct the lag. Without this information, the required inputs do not exist.</p>
+<p>Predicting to new locations in spatially explicit machine learning models is ill-defined. These models use spatially lagged covariates, message passing in the case of graph neural networks (GNNs), or otherwise derived variables from the training data, which are defined only for locations embedded in the training spatial weights matrix (SWM). Prediction requires both identifying the neighborhood structure of new locations and accessing the covariate values used to construct spatially explicit features. Without this information, the required inputs do not exist.</p>
 </section>
 <section id="spatially-explicit-model-approaches" class="level2">
 <h2 class="anchored" data-anchor-id="spatially-explicit-model-approaches">Spatially Explicit Model Approaches</h2>
@@ -140,8 +141,9 @@ window.Quarto = {
 <li><strong>Moran Eigenvector Maps (MEMs)</strong>: Spatial features derived from the spatial weights matrix</li>
 <li><strong>Geographically Weighted Regression (GWR/MGWR)</strong>: Local regression coefficients estimated at each location</li>
 <li><strong>Distance features</strong>: Covariates computed relative to external reference layers</li>
-<li><strong>Spatial indexing</strong>: H3, S2, or geohashes as categorical features (unproblematic for prediction)</li>
 <li><strong>Coordinates and regimes</strong>: X/Y coordinates or spatial regimes as features (unproblematic for prediction)</li>
+<li><strong>Location Embeddings</strong>: Models that take X/Y coordinates and create more “rich” variables from them</li>
+<li><strong>Spatial indexing</strong>: H3, S2, or geohashes as categorical features (unproblematic for prediction)</li>
 </ul>
 <p>For simplicity, we focus on <strong>spatial lags</strong> as the canonical spatially explicit feature, though the challenges discussed apply broadly to approaches dependent on the spatial weights matrix or training data. At the end we discuss how these challenges extend to other approaches.</p>
 </section>
@@ -164,7 +166,7 @@ window.Quarto = {
 <li><strong>C1 (Individual lookup)</strong>: Each test point finds neighbors in the training set independently; test points do not see each other.</li>
 <li><strong>C2 (Grow adjacency matrix)</strong>: Combine training and test points into a new adjacency matrix where test points can neighbor each other and training points.</li>
 </ul>
-<p>None of these approaches is obviously correct. Each involves trade-offs between semantic consistency, data leakage, and the ability to predict at new locations. The common practice (Position A) works for in-sample evaluation but leaves prediction to new locations undefined. Position C variants enable prediction but introduce semantic inconsistency—the model learns relationships among training neighbors but predicts using different neighbor definitions.</p>
+<p>None of these approaches is obviously correct. Each involves trade-offs between semantic consistency and the ability to predict at new locations. The common practice (Position A) works for in-sample evaluation but leaves prediction to new locations undefined. Position C variants enable prediction but introduce semantic inconsistency—the model learns relationships among training neighbors but predicts using different neighbor definitions.</p>
 </section>
 <section id="challenges-for-prediction" class="level2">
 <h2 class="anchored" data-anchor-id="challenges-for-prediction">Challenges for Prediction</h2>
@@ -180,213 +182,67 @@ window.Quarto = {
 <p><strong>Position C1 in practice <span class="citation" data-cites="sarf2025">(<a href="#ref-sarf2025" role="doc-biblioref">Credit 2025</a>)</span></strong>: The <code>{sarf}</code> package’s <code>spatial_cv_rf()</code> function finds neighbors in the training set for each test observation independently. Test points do not see each other, even if spatially adjacent.</p>
 <p><strong>Position C1 with explicit prediction <span class="citation" data-cites="Gao2025-mgwxgb">(<a href="#ref-Gao2025-mgwxgb" role="doc-biblioref">Gao, He, and Kwan 2025</a>)</span></strong>: M-GWXGB explicitly implements prediction to new locations by finding k-nearest training locations and averaging their local model predictions. This requires persisting all local models, training locations, and bandwidth—the model alone cannot predict.</p>
 </section>
-<section id="status-quo" class="level2">
-<h2 class="anchored" data-anchor-id="status-quo">Status Quo</h2>
-<p>Above has discussed spatial lags and the issues associated with them. Below is the general status quo of spatially explicit modelling techniques.</p>
-<section id="unproblematic-spatially-explicit-modeling-techniques" class="level3">
-<h3 class="anchored" data-anchor-id="unproblematic-spatially-explicit-modeling-techniques">Unproblematic spatially explicit modeling techniques</h3>
-<p>The following techniques are not problematic in creating spatially explicit traditional ML models (regression, tree-based models, NN, etc.).</p>
+<section id="extension-to-other-spatially-explicit-approaches" class="level2">
+<h2 class="anchored" data-anchor-id="extension-to-other-spatially-explicit-approaches">Extension to Other Spatially Explicit Approaches</h2>
+<p>The three positions (A, B, C) and associated prediction challenges extend to other spatially explicit modeling techniques. Each approach presents different constraints on which positions are viable.</p>
+<section id="potentially-problematic-approaches" class="level3">
+<h3 class="anchored" data-anchor-id="potentially-problematic-approaches">Potentially Problematic Approaches</h3>
+<p>These techniques avoid neighborhood dependencies but face out-of-distribution problems when predicting outside the training region:</p>
 <ul>
-<li>no spatial features (no problem)</li>
-<li>with X &amp; Y coords (no probem-ish)</li>
-<li>with spatial indices (H3, S2, Geohash)</li>
-<li>spatial regimes (categorical variables indicating a location—e.g.&nbsp;state name, county ID, etc.)</li>
+<li>X/Y coordinates: Training on one region (e.g., North America) and predicting in another (e.g., Asia) encounters coordinate values never seen during training</li>
+<li>Spatial indices (H3, S2, Geohash): Training on cells in one region and predicting in different cells creates unseen categorical values</li>
+<li>Spatial regimes (state/county IDs): Training on one set of regimes and predicting on different regimes encounters unseen categorical values</li>
+<li>Pre-trained location encoders: Global encoders like GeoCLIP <span class="citation" data-cites="cepeda2023geoclipclipinspiredalignmentlocations">(<a href="#ref-cepeda2023geoclipclipinspiredalignmentlocations" role="doc-biblioref">Cepeda, Nayak, and Shah 2023</a>)</span> work worldwide <span class="citation" data-cites="Zhang20012026">(<a href="#ref-Zhang20012026" role="doc-biblioref">Zhang et al. 2026</a>)</span>. Regional encoders trained on limited extents produce unreliable embeddings outside their training region</li>
+<li>These approaches avoid spatial lag challenges (no SWM, no neighborhood definitions) but remain vulnerable to geographic distribution shift</li>
 </ul>
 </section>
 <section id="distance-features" class="level3">
 <h3 class="anchored" data-anchor-id="distance-features">Distance Features</h3>
+<p>Distance features computed relative to external reference layers face analogous questions to spatial lags:</p>
 <ul>
-<li>Begets similar questions:</li>
-<li>Which distance features do we use?</li>
-<li>Training distance features (Option A)?</li>
-<li>New distance features relevant to test set (Option B)?</li>
-<li>Training distance features + new relevant distant features (Option C2)?</li>
+<li>Position A: Use only training distance features (requires storage and availability)</li>
+<li>Position B: Calculate new distance features for test locations (requires reference layers; potential semantic inconsistency)</li>
+<li>Position C2: Combine training and new distance features (raises questions about when augmentation is valid)</li>
+<li>Like spatial lags, requires supplementary data beyond the model itself</li>
 </ul>
 </section>
-<section id="mems" class="level3">
-<h3 class="anchored" data-anchor-id="mems">MEMs</h3>
+<section id="moran-eigenvector-maps-mems" class="level3">
+<h3 class="anchored" data-anchor-id="moran-eigenvector-maps-mems">Moran Eigenvector Maps (MEMs)</h3>
+<p>MEMs are derived directly from the SWM, creating strong dependence on neighborhood structure:</p>
 <ul>
-<li>depends on the SWM</li>
-<li>Option A works—store MEMs and query them for new features</li>
-<li>Option B works—calculate MEMs on new data exact same way (this is inductive approach similar to inductive graph models)</li>
-<li>Option C doesn’t work—we’d need to get a MEM for a new feature not in the SWM</li>
+<li>Position A: Store MEMs and query for predictions at original locations (straightforward)</li>
+<li>Position B: Calculate MEMs on new data using same adjacency definition (inductive approach)</li>
+<li>Position C: Cannot derive MEMs for new observations not in original SWM decomposition (eigenvector decomposition cannot be incrementally updated)</li>
+<li>Particularly inflexible for prediction at new locations within the original study area</li>
 </ul>
 </section>
-<section id="gwr-mgwr" class="level3">
-<h3 class="anchored" data-anchor-id="gwr-mgwr">GWR &amp; MGWR</h3>
-<p>todo!()</p>
-</section>
-<section id="graph-models" class="level3">
-<h3 class="anchored" data-anchor-id="graph-models">Graph Models</h3>
+<section id="gwr-and-mgwr" class="level3">
+<h3 class="anchored" data-anchor-id="gwr-and-mgwr">GWR and MGWR</h3>
+<p>GWR and MGWR produce <span class="math inline">\(n\)</span> sets of local coefficients rather than a single global model. Prediction at new locations requires fitting new weighted regression using nearby training observations:</p>
 <ul>
-<li>inductive (new graph option B)</li>
-<li>transductive (same graph new data Option A)</li>
-<li>transductive (new points in same graph Option C1 &amp; C2 requires inserting into Adjacenc and running forward pass for fine tuning)
-<ul>
-<li>what is the consequence of this?</li>
-</ul></li>
-</ul>
-<hr>
-</section>
-</section>
-<section id="notes" class="level1">
-<h1>Notes</h1>
-<section id="current-practice-and-its-implicit-assumptions" class="level3">
-<h3 class="anchored" data-anchor-id="current-practice-and-its-implicit-assumptions">Current Practice and Its Implicit Assumptions</h3>
-<ul>
-<li>Standard workflow: calculate spatial lag (or other spatially derived features) on the full dataset, then partition into train/test/validation sets for spatial CV</li>
-<li>This approach has a transductive character—test observations are embedded in the spatial graph from the start</li>
-<li>The spatial lag of a test observation was computed using training observations (and vice versa)</li>
-<li>The test set was never truly “held out”—it participated in feature construction</li>
-<li>Spatial CV is presented as rigorous, but if features are computed on the full graph before splitting, what is actually being validated?</li>
-<li>This workflow implicitly assumes a closed system where all locations are known at training time</li>
-<li>Prediction to genuinely new locations is undefined because the workflow was never designed for it</li>
+<li>Requires full training dataset (<span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>) at prediction time, not just serialized model</li>
+<li>Bandwidth(s) from training can be reused, but coefficient estimation needs training data</li>
+<li>Aligns with Position C1 (querying training set) but cannot escape model + data requirement</li>
+<li>“Train once, predict anywhere” paradigm does not apply</li>
 </ul>
 </section>
-<section id="positions-on-spatial-feature-construction" class="level3">
-<h3 class="anchored" data-anchor-id="positions-on-spatial-feature-construction">3 Positions on Spatial Feature Construction</h3>
-<p>When confronting the train/test boundary, three coherent positions exist. For illustration, assume we use <span class="math inline">\(k\)</span>-nearest neighbors (kNN) as the method of defining adjacency, though the logic applies to other adjacency definitions.</p>
-<p><strong>A. Closed system (transductive)</strong></p>
+<section id="graph-neural-networks" class="level3">
+<h3 class="anchored" data-anchor-id="graph-neural-networks">Graph Neural Networks</h3>
+<p>GNNs face similar but more rigid constraints:</p>
 <ul>
-<li>Calculate spatial lag on the full dataset (train + test) before splitting</li>
-<li>Semantically consistent—lag means the same thing for all observations</li>
-<li>Implies: leakage; test set must be known at training time; prediction to new locations undefined</li>
+<li>Transductive GNNs (e.g GCN): Fixed graph, cannot generalize to unseen nodes (inherently Position A)</li>
+<li>Inductive GNNs (e.g.&nbsp;GraphSAGE): Can generalize to new structures (Position B) but still require graph structure at prediction time</li>
+<li>Position C variants: Require reconstructing/augmenting adjacency matrix, then forward pass with expanded graph</li>
+<li>Open question: Does inserting new nodes and running forward pass without retraining preserve semantic meaning or introduce Position C inconsistencies?</li>
 </ul>
-<p><strong>B. Fully separate graphs</strong></p>
-<ul>
-<li>Training: lags computed among training points only</li>
-<li>Testing: lags computed among test points only (neighbors are other test points)</li>
-<li>Semantically consistent—lag always means “average among my peers”</li>
-<li>Implies: model is evaluated on a different graph structure than it was trained on</li>
-</ul>
-<p><strong>C. Hybrid approaches (test lags incorporate training data)</strong></p>
-<p>Two variants exist:</p>
-<ul>
-<li><strong>C1: Individual lookup</strong> — Each test point finds its neighbors in the training set independently. Test points do not see each other. The adjacency matrix is not grown; test points query against it.</li>
-<li><strong>C2: Grow the adjacency matrix</strong> — Combine test and training points into a new adjacency matrix. Test points can be neighbors of each other <em>and</em> of training points. Lags are computed on this combined structure.</li>
-</ul>
-<p>Both variants change the meaning of the spatial lag between training and testing. C1 treats each prediction as an isolated query; C2 treats the test set as a cohort integrated into the spatial structure.</p>
-<p><em>Note</em>: None of these approaches is obviously correct. Each involves trade-offs between semantic consistency, data leakage, and the ability to predict at new locations. These positions directly inform the adjacency decisions discussed in the prediction scenarios below.</p>
-</section>
-<section id="the-semantic-inconsistency-of-position-c" class="level3">
-<h3 class="anchored" data-anchor-id="the-semantic-inconsistency-of-position-c">The Semantic Inconsistency of Position C</h3>
-<ul>
-<li>During training, the spatial lag for observation <span class="math inline">\(i\)</span> is the (weighted) mean of <span class="math inline">\(Y\)</span> among <span class="math inline">\(i\)</span>’s neighbors—all of whom are in the training set</li>
-<li>Under Position C1, the spatial lag for test observation <span class="math inline">\(j\)</span> is the mean of <span class="math inline">\(Y\)</span> among <span class="math inline">\(j\)</span>’s neighbors <em>in the training set</em>—the test point is querying a dataset it does not belong to</li>
-<li>Under Position C2, the adjacency matrix is recalculated to include both training and test observations; test points can be neighbors of each other and of training points</li>
-<li>The model learns “when my neighbors have high <span class="math inline">\(Y\)</span>, I tend to have high <span class="math inline">\(Y\)</span>”—but for test points under C1, “neighbors” means “nearest training observations”</li>
-</ul>
-</section>
-<section id="detailed-approaches-by-type" class="level3">
-<h3 class="anchored" data-anchor-id="detailed-approaches-by-type">Detailed Approaches by Type</h3>
-<p><strong>Approaches Unproblematic for Prediction</strong></p>
-<ul>
-<li>Including X &amp; Y coordinates in a model—not ideal, but not problematic for prediction
-<ul>
-<li>Doesn’t incorporate relationship of feature and neighborhood</li>
-</ul></li>
-<li>Using H3 indexes, S2 indexes, or geohashes as categorical features
-<ul>
-<li>H3 recommends using <code>kRing</code> for spatial “convolution” (just a spatial lag) https://h3geo.org/docs/highlights/ml/</li>
-<li>H3 interpolation in “Geographic Data Science with Python” https://geographicdata.science/book/notebooks/12_feature_engineering.html</li>
-<li>https://www.analyticsvidhya.com/blog/2025/03/ubers-h3-for-spatial-indexing/#h-combining-h3-with-machine-learning</li>
-</ul></li>
-<li>Spatial regimes (e.g.&nbsp;state names) as categorical features</li>
-</ul>
-<p><em>Note</em>: These approaches allow prediction at new locations provided the index or regime can be assigned.</p>
-<p><strong>Explanatory Distance Features</strong></p>
-<ul>
-<li>Distance features are computed relative to external reference layers</li>
-<li>The model alone cannot predict—it requires the model plus the distance feature layers (supplementary data)</li>
-<li>This raises the same structural questions as spatial lag models:
-<ul>
-<li>Must the distance feature layers be identical to those used during training?</li>
-<li>Can we use new/matched distance feature layers for a different study area? When is this valid?</li>
-<li>Can distance feature layers grow (training layers + new layers)?</li>
-</ul></li>
-<li>The choice of how to handle distance features at prediction time parallels the adjacency choices for spatial lag models</li>
-</ul>
-<p><strong>Approaches Dependent on the SWM</strong></p>
-<ul>
-<li>A spatial weights matrix is an n×n sparse square matrix. Non-zero values indicate the presence of a neighbor. By default, these are binary matrices where 1 indicates a neighbor. In this case a SWM is an adjacency matrix.</li>
-<li>Models use spatial lags in the case of spatial regression (Anselin and Rey)</li>
-<li>Include Moran Eigenvector Maps (MEMs) which are derived from the SWM (Dray)
-<ul>
-<li>Cannot be used on new locations</li>
-</ul></li>
-<li>Graph neural nets—a growing way of explicitly incorporating space—use “message passing” which is equivalent to a spatial lag except on hidden dimensions</li>
-</ul>
-<p><em>Note</em>: These approaches bind the model to a fixed neighborhood structure and create the prediction problem.</p>
-<p><strong>Approaches Dependent on Training Data at Prediction Time</strong></p>
-<ul>
-<li>Geographically Weighted Regression (GWR) and Multiscale GWR (MGWR) do not use a SWM, but face analogous prediction challenges</li>
-<li>GWR fits local regression coefficients at each training location using distance-weighted observations</li>
-<li>The “model” is not a single set of coefficients—it is <span class="math inline">\(n\)</span> sets of local coefficients, one per training location</li>
-<li>To predict at a new location, coefficients must be estimated <em>at that location</em> by fitting a new weighted regression using nearby training observations</li>
-<li>This requires access to training <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> at prediction time, not just a saved model object</li>
-<li>MGWR adds complexity: each covariate has its own bandwidth, requiring multiple local regressions at each new prediction point</li>
-<li>The bandwidth(s) learned during training can be reused, but the local coefficient estimation still requires training data</li>
-</ul>
-<p><em>Note</em>: GWR/MGWR cannot escape the same fundamental issue—prediction requires access to training data, not just a serialized model. The “train once, predict anywhere” paradigm does not apply.</p>
-</section>
-<section id="detailed-prediction-scenarios" class="level3">
-<h3 class="anchored" data-anchor-id="detailed-prediction-scenarios">Detailed Prediction Scenarios</h3>
-<p><strong>Prediction Scenarios: Spatial Lag Models</strong></p>
-<p>Model was trained on a study area with a spatial lag of variable <span class="math inline">\(X_1\)</span>.</p>
-<p><strong>Prediction at All Original Locations with Updated Covariates</strong></p>
-<p>We want to predict for all of the same locations we trained on, but with new covariate values collected post-training. We can use the same adjacency matrix and calculate the spatial lag of <span class="math inline">\(X_1\)</span> using new data for all locations.</p>
-<ul>
-<li>We can either persist the SWM or recreate it</li>
-<li>Requires new <span class="math inline">\(X_1\)</span> for all locations</li>
-</ul>
-<p><strong>Prediction at a Single Original Location</strong></p>
-<p>We want to predict to a single location in the original training set. We know the adjacency for this location. We can calculate lag of <span class="math inline">\(X_1\)</span> from training data and use that as lag of <span class="math inline">\(X_1\)</span>.</p>
-<ul>
-<li>Requires we persist the SWM</li>
-<li>Requires we persist the original <span class="math inline">\(X_1\)</span> for all locations so we can derive lag of <span class="math inline">\(X_{1i}\)</span> at a later point</li>
-</ul>
-<p><strong>Prediction at an Entirely New Study Area</strong></p>
-<p>We want to predict to an entirely new study area using the same model. We must calculate lag of <span class="math inline">\(X_1\)</span> using our new data. We are responsible for creating a new SWM based on the input data.</p>
-<ul>
-<li>We must create a new SWM on the new data—raises questions about how we define adjacency for the new data. Must it be the same adjacency structure—e.g.&nbsp;trained on k-NN predicted to k-NN?</li>
-<li>Requires that we calculate lag of <span class="math inline">\(X_1\)</span> from <span class="math inline">\(X_1\)</span> of all new locations</li>
-</ul>
-<p><strong>Prediction at m New Locations Within the Original Study Area</strong></p>
-<p>We want to predict <span class="math inline">\(m\)</span> new locations that are part of the study region. This is where the positions defined in “Three Positions on Spatial Feature Construction” become operationally relevant:</p>
-<ul>
-<li><strong>Position B</strong>: Adjacency defined only among the new prediction set, ignoring the training graph</li>
-<li><strong>Position C1</strong>: Each new point finds neighbors in the original SWM only; new points do not see each other</li>
-<li><strong>Position C2</strong>: Grow the adjacency matrix to include both original and new locations; new points can be neighbors of each other and of training points</li>
-</ul>
-<p>In all scenarios this requires:</p>
-<ul>
-<li>We persist the original SWM</li>
-<li>We persist the original <span class="math inline">\(X_1\)</span> for all locations</li>
-<li>If the SWM is grown (Position C2), we must augment the SWM and persist it, same with <span class="math inline">\(X_1\)</span> data</li>
-</ul>
-<p><strong>Prediction Scenarios: Graph Neural Networks</strong></p>
-<p><strong>Transductive vs.&nbsp;Inductive Models</strong></p>
-<ul>
-<li>Transductive: Fixed graph; cannot generalize to unseen nodes</li>
-<li>Inductive: Can generalize, but still requires graph structure for new nodes</li>
-</ul>
-<p>TODO: discuss transductive vs inductive models in more detail</p>
-<p><strong>Prediction Mechanics</strong></p>
-<p>When we consider GNNs these same points are the same/similar. However, we cannot necessarily predict to new locations unless using an inductive model. In order to predict with a GNN, the full adjacency matrix and X matrix must be provided. So, in order to do this, we must insert new points into the trained adjacency matrix. This thus requires us to address the same problems as spatial lag models.</p>
-</section>
-<section id="literature-examples-detailed" class="level3">
-<h3 class="anchored" data-anchor-id="literature-examples-detailed">Literature Examples (Detailed)</h3>
-<p><strong>Position A in practice: <span class="citation" data-cites="Liu2022-pv">Liu, Kounadi, and Zurita-Milla (<a href="#ref-Liu2022-pv" role="doc-biblioref">2022</a>)</span></strong></p>
-<p><span class="citation" data-cites="Liu2022-pv">Liu, Kounadi, and Zurita-Milla (<a href="#ref-Liu2022-pv" role="doc-biblioref">2022</a>)</span> compute spatial lags on the full dataset before partitioning for cross-validation. This is Position A—the standard practice. It works for in-sample evaluation but leaves prediction to new locations undefined.</p>
-<p><strong>Position C1 in practice: <span class="citation" data-cites="sarf2025">Credit (<a href="#ref-sarf2025" role="doc-biblioref">2025</a>)</span></strong></p>
-<p>The <code>{sarf}</code> package’s <code>spatial_cv_rf()</code> function implements Position C1 (see https://github.com/kcredit/SArf/blob/58b26a4e4be43b3ddf2dbee08e38b86066b40c96/R/spatial_cv.R#L16). For each test observation, it finds neighbors in the training set and computes the lag from training <span class="math inline">\(Y\)</span> values. Each test point is treated as an isolated query against the training graph. Test points do not see each other—even if two test points are spatially adjacent, they cannot be neighbors.</p>
-<p><strong>Position C1 with explicit prediction: <span class="citation" data-cites="Gao2025-mgwxgb">Gao, He, and Kwan (<a href="#ref-Gao2025-mgwxgb" role="doc-biblioref">2025</a>)</span></strong></p>
-<p>M-GWXGB is notable for explicitly implementing prediction to new locations. The <code>GeoWeightedXGBoostPredictor</code> class predicts at new locations by finding the k-nearest training locations, retrieving those locations’ models, and averaging their predictions (see https://github.com/yiloufengyue/M-GWXGB/blob/main/M_GWXGB_1.py). This requires persisting all local models, training locations, and the bandwidth. The model alone cannot predict—it requires the full training infrastructure.</p>
 
 </section>
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-cepeda2023geoclipclipinspiredalignmentlocations" class="csl-entry" role="listitem">
+Cepeda, Vicente Vivanco, Gaurav Kumar Nayak, and Mubarak Shah. 2023. <span>“GeoCLIP: Clip-Inspired Alignment Between Locations and Images for Effective Worldwide Geo-Localization.”</span> <a href="https://arxiv.org/abs/2309.16020">https://arxiv.org/abs/2309.16020</a>.
+</div>
 <div id="ref-sarf2025" class="csl-entry" role="listitem">
 Credit, Kevin. 2025. <span>“<span>SArf</span>: Spatial Autoregressive Random Forest.”</span> <a href="https://github.com/kcredit/SArf">https://github.com/kcredit/SArf</a>.
 </div>
@@ -395,6 +251,9 @@ Gao, Fan, Sylvia Y. He, and Mei-Po Kwan. 2025. <span>“Mixed Geographically Wei
 </div>
 <div id="ref-Liu2022-pv" class="csl-entry" role="listitem">
 Liu, Xiaojian, Ourania Kounadi, and Raul Zurita-Milla. 2022. <span>“Incorporating Spatial Autocorrelation in Machine Learning Models Using Spatial Lag and Eigenvector Spatial Filtering Features.”</span> <em>ISPRS Int. J. Geoinf.</em> 11 (4): 242.
+</div>
+<div id="ref-Zhang20012026" class="csl-entry" role="listitem">
+Zhang, Jielu, Lan Mu, Gengchen Mai, Andrew Grundstein, Zhongliang Zhou, and Donglan Zhang. 2026. <span>“SpatialCausal: A Spatially-Aware Causal Inference Deep Learning Model for Out-of-Hospital Cardiac Arrest Survival Prediction.”</span> <em>International Journal of Geographical Information Science</em> 0 (0): 1–36. <a href="https://doi.org/10.1080/13658816.2025.2611981">https://doi.org/10.1080/13658816.2025.2611981</a>.
 </div>
 </div></section></div></main>
 <!-- /main column -->
